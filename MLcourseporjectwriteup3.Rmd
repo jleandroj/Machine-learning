@@ -1,0 +1,176 @@
+---
+title: 'Practical Machine Learning: Course project writeup'
+author: "Leandro Jimenez"
+date: "Saturday, December 26, 2015"
+output: html_document
+---
+
+### Background and Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks.
+
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, we will use data recorded from accelerometers on the belt, forearm, arm, and dumbbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+More information is available from the website [http://groupware.les.inf.puc-rio.br/har] [1] (see the section on the Weight Lifting Exercise Dataset).
+[1]: http://groupware.les.inf.puc-rio.br/har
+
+The goal of this project is to predict the manner in which the participants did the exercise. This is the classe variable of the training set, which classifies the correct and incorrect outcomes into A, B, C, D, and E categories. This report describes how the model for the project was built, its cross validation, expected out of sample error calculation, and the choices made. It was used successfully to accurately predict all 20 different test cases on the Coursera website.
+
+This document is the write-up submission for the course Practical Machine Learning by Jeff Leek, PhD, Professor at Johns Hopkins University, Bloomberg School of Public Health. This 4-week course was offered on Coursera in June 2015, and is part of Johns Hopkins Data Science Specialization.
+
+
+### Data Description
+
+The training data for this project are available here:
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv] [2]
+
+[2]: [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv]
+
+The test data are available here:
+[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv] [3]
+
+[3]: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+We first download the data from the links referenced above to our computer and upload the files into R (using RStudio), interpreting the miscellaneous NA, #DIV/0! and empty fields as NA:
+
+save the Urls and read data. Then, visually reviewed the data to cleanup NA, DIV/0!, blank data on import and store locally
+
+```{r}
+library(caret)
+library(rpart)
+library(randomForest)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+```{r}
+trainSource <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testSource <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+download.file(trainSource, destfile = "pml-testing.csv")
+download.file(testSource, destfile = "pml-training.csv")
+
+
+trainData <- read.csv(url(trainSource), na.strings=c("NA","#DIV/0!","")) 
+testData <- read.csv(url(testSource), na.strings=c("NA","#DIV/0!","")) 
+```
+
+Dimensions
+
+```{r}
+dim(trainData)
+dim(testData)
+```
+
+### Processing of data
+
+#### get columns of Interest as predictors 
+
+Pollect data on all columns that have all NA values in the testData dataset. Remove the those 'NA' columns from both datasets 
+
+```{r}
+id_NA_Cols <- sapply(testData,function(x)any(is.na(x)))
+trainData <- trainData[,!(id_NA_Cols)]
+testData <- testData[,!(id_NA_Cols)]
+```
+
+"classe" outcome to be predicted, remove X from both datasets and problem_id from the trainData set.
+
+```{r}
+
+trainData <- trainData[, -1] 
+testData <- testData[, -1] 
+testData <- testData[, -length(colnames(testData))] 
+```
+
+New dimensions
+
+```{r}
+dim(trainData)
+dim(testData)
+```
+
+The trainData was partitioned into training (workingTraining) and testing (workingTesting) subsets.
+
+```{r}
+
+inTrain <- createDataPartition(y=trainData$classe, p=0.6, list=FALSE) 
+workingTraining <- trainData[inTrain,]
+workingTesting <- trainData[-inTrain,]
+dim(workingTraining)
+dim(workingTesting)
+
+```
+
+### Model
+
+
+### Decision Tree
+
+I was used “rpart()”. The resulting model yielded an accuracy of more than 87%
+Sample error= 12.91%. For the purposes of this analysis cross-validation was not considered for rpart() as the randomForest() model documented next, adequately predicted the outcomes.
+
+```{r}
+modelrpart2 <- rpart(classe ~ ., data=workingTraining, method="class") 
+```
+
+Plot tree
+
+```{r}
+#plot(modelrpart2)
+#text(modelrpart2, use.n=FALSE, all=FALSE, cex=.5)
+fancyRpartPlot(modelrpart2) #prettiest
+```
+
+Prediction and Confusion Matrix
+
+```{r}
+#predict
+predictrpart2 <- predict(modelrpart2, workingTesting, type="class")
+
+#confusion matrix
+confusionMatrix(predictrpart2, workingTesting$classe)
+```
+
+### Random Forests
+
+I was used “randomForest”, with accuracy of more than 99%.
+sample error= .19%. 
+
+```{r}
+#library(randomForest)
+modelrf2 <- randomForest(classe ~ ., data=workingTraining) 
+print(modelrf2)
+```
+
+Importance was examined and plotted.
+
+```{r}
+#importance(modelrf2)
+varImpPlot(modelrf2) #cool
+```
+
+### Prediction and Confusion Matrix
+
+```{r}
+#predict
+predictrf2 <- predict(modelrf2, workingTesting, type="class")
+
+#confusion matrix
+confusionMatrix(predictrf2, workingTesting$classe)
+```
+
+### Apply The Models
+
+```{r}
+finalPredictionrpart <- predict(modelrpart2, testData, type="class")
+finalPredictionrpart
+```
+
+Out of Sample Error Discussion
+
+The randomForest model was expected to yield an accuracy of 99.81%, therefore an out of sample error rate of approximately .19% was expected. 
+
+The rpart model was expected to yield an accuracy of 87.09%, therefore an out of sample error rate of approximately 12.91% was expected. 
+
+This model also did better than expected against the testingData dataset yielding 90% accuracy. The testingData dataset consisted of 20 observations. 
+
